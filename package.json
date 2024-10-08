@@ -1,9 +1,15 @@
 {
-  "name": "pdf-thumbnail",
+  "name": "@mkholt/pdf-thumbnail",
   "version": "1.0.0",
   "description": "React wrapper around PDF-js allowing creation of thumbnails both server and client side",
-  "main": "index.js",
-  "repository": "https://github.com/mkholt/pdf-thumbnail",
+  "main": "dist/index.js",
+  "repository": {
+    "type": "git",
+    "url": "github:mkholt/pdf-thumbnail"
+  },
+  "files": [
+    "dist/*"
+  ],
   "author": "Morten Holt <mho@delegate.dk>",
   "license": "MIT",
   "devDependencies": {
