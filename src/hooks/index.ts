@@ -1,1 +1,1 @@
-export * from "./useThumbnails"
+export * from "./useThumbnails.js"
