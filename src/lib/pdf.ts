@@ -1,7 +1,7 @@
 import { getDocument, type PDFPageProxy } from "pdfjs-dist/legacy/build/pdf.mjs"
 import "pdfjs-dist/legacy/build/pdf.worker"
 import { isDefined } from "@mkholt/utilities"
-import { FileData, Thumbnail } from "../types"
+import { FileData, Thumbnail } from "../types/index.js"
 
 export async function createThumbnails<T extends FileData>(files: T[], prefix?: string): Promise<(T & Thumbnail)[]> {
 	const filePromises = files
@@ -22,14 +22,17 @@ export async function createThumbnail(file: string, toBuffer: false): Promise<st
 export async function createThumbnail(file: string, toBuffer?: boolean): Promise<string|undefined>;
 export async function createThumbnail(file: string, toBuffer: boolean | undefined = false): Promise<string|Buffer|undefined> {	
 	try {
-		console.log("Attempting to load", file)
+		console.log("[PDF]", "Loading file", file)
 		const doc = await getDocument(file).promise
-		console.log("[PDF]", "PDF loaded", doc.numPages, "pages")
+		console.log("[PDF]", "PDF loaded,", doc.numPages, "pages")
+		if (doc.numPages === 0) return undefined
+
 		const page = await doc.getPage(1)
 
 		return await makeThumbOfPage(page, toBuffer)
 	} catch (e: unknown) {
-		console.error("Failed to load PDF", file, e)
+		console.error("Error trying to make thumbnail of file", file)
+		console.error(e)
 	}
 }
 

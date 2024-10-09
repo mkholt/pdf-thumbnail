@@ -1,2 +1,2 @@
-export * from "./fileData"
-export * from "./thumbnailData"
+export * from "./fileData.js"
+export * from "./thumbnailData.js"

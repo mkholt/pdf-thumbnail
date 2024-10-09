@@ -1,6 +1,6 @@
 import React from "react";
-import { FileData, isThumbnailArray, Thumbnail } from "../types";
-import { createThumbnails } from "../lib";
+import { FileData, isThumbnailArray, Thumbnail } from "../types/index.js";
+import { createThumbnails } from "../lib/index.js";
 
 export function useThumbnails<T extends FileData>(files?: T[], prefix?: string): (T & Thumbnail)[];
 export function useThumbnails(files?: Thumbnail[], prefix?: string): Thumbnail[];
