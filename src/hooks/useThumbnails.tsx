@@ -1,23 +1,23 @@
 import React from "react";
-import { FileData, isThumbnailArray, Thumbnail } from "../types/index.js";
+import { FileData, Thumbnail } from "../types/index.js";
 import { createThumbnails } from "../lib/index.js";
 
-export function useThumbnails<T extends FileData>(files?: T[], prefix?: string): (T & Thumbnail)[];
-export function useThumbnails(files?: Thumbnail[], prefix?: string): Thumbnail[];
-export function useThumbnails<T extends FileData>(files?: T[] | Thumbnail[], prefix?: string): (T & Thumbnail)[] | Thumbnail[] {
-	const [thumbs, setThumbs] = React.useState<(T & Thumbnail)[] | Thumbnail[]>([])
+/**
+ * Given an array of files, creates thumbnails for each file and returns an array of data objects with the thumbnail data included
+ * 
+ * @param files Array of files to create thumbnails for
+ * @param prefix If provided, all filenames will be prefixed with the given string before fetching
+ * @returns An array of data objects with the thumbnail data included
+ */
+export function useThumbnails<T extends FileData>(files: T[], prefix?: string): (T & Thumbnail)[] {
+	const [thumbs, setThumbs] = React.useState<(T & Thumbnail)[]>([])
 
 	React.useEffect(() => {
-		if (!files) return;
+		if (!files.length) return;
 
-		if (isThumbnailArray(files)) {
-			setThumbs(files);
-		}
-		else {
-			createThumbnails(files, prefix)
-				.then(setThumbs);
-		}
-	}, [files])
+		createThumbnails(files, prefix)
+			.then(setThumbs);
+	}, [files, prefix])
 
 	return thumbs;
 }

@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
-import { createThumbnail, createThumbnails } from "../src/lib/pdf.js";
-import { FileData } from "../src/types/index.js";
+import { createThumbnail, createThumbnails } from "../../src/lib/pdf.js";
+import { FileData } from "../../src/types/index.js";
 
 test("Creating a thumbnail from a PDF", async () => {
 	const thumb = await createThumbnail("tests/samples/sample.pdf");
