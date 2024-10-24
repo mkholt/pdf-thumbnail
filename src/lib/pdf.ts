@@ -1,5 +1,5 @@
 import { getDocument, type PDFPageProxy } from "pdfjs-dist/legacy/build/pdf.mjs"
-import "pdfjs-dist/legacy/build/pdf.worker"
+import "pdfjs-dist/legacy/build/pdf.worker.mjs"
 import { isDefined } from "@mkholt/utilities"
 import { FileData, Thumbnail } from "../types/index.js"
 
