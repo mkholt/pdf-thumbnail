@@ -1,6 +1,6 @@
 {
   "name": "@mkholt/pdf-thumbnail",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "React wrapper around PDF-js allowing creation of thumbnails both server and client side",
   "main": "dist/index.js",
   "repository": {
@@ -16,12 +16,9 @@
   "scripts": {
     "preversion": "yarn test run",
     "prepack": "yarn build",
-    
     "prebuild": "rimraf dist",
     "build": "tsc",
-    
     "postversion": "git push --tags && x-var yarn publish --access public --new-version $npm_package_version . && git push",
-    
     "test": "vitest",
     "test:coverage": "vitest --coverage"
   },
