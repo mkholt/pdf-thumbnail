@@ -14,7 +14,7 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "preversion": "yarn test",
+    "preversion": "yarn test run",
     "prepack": "yarn build",
     
     "prebuild": "rimraf dist",
