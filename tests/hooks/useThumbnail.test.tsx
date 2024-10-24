@@ -19,7 +19,12 @@ describe('useThumbnails hook', () => {
 	})
 
 	afterEach(() => {
+		vi.clearAllMocks();
+	})
+
+	afterEach(() => {
 		cleanup();
+		
 	})
 
 	it('should initialize with an empty array', () => {

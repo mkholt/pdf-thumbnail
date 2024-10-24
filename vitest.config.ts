@@ -13,11 +13,6 @@ export default defineConfig({
 		environmentMatchGlobs: [
 			['tests/**/*.tsx', 'jsdom']
 		],
-		setupFiles: ['tests/setup.http.ts'],
-		poolOptions: {
-			threads: {
-				maxThreads: 1
-			}
-		}
+		setupFiles: ['tests/setup.http.ts']
 	}
 })

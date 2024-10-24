@@ -77,12 +77,12 @@ async function createCanvas(width: number, height: number): Promise<CanvasType> 
 
 function getResult({canvas, type}: CanvasType, toBuffer: boolean): string|Buffer {
 	const dataUrl = canvas.toDataURL("image/png");
-	switch (type) {
-		case "node":
-			return toBuffer ? canvas.toBuffer("image/png") : dataUrl;
-		case "html":
-			const base64 = dataUrl.split(",")[1];
-			return toBuffer ? Buffer.from(base64, "base64") : dataUrl;
+
+	if (type === "node") {
+		return toBuffer ? canvas.toBuffer("image/png") : dataUrl;
+	} else {
+		const base64 = dataUrl.split(",")[1];
+		return toBuffer ? Buffer.from(base64, "base64") : dataUrl;
 	}
 }
 
@@ -91,10 +91,10 @@ async function makeThumbOfPage(page: PDFPageProxy, toBuffer: boolean): Promise<s
 
 	const canvasInfo = await createCanvas(viewport.width, viewport.height)
 	const { canvas, type } = canvasInfo
-	const context = canvas.getContext("2d") as unknown as CanvasRenderingContext2D
+	const context = canvas.getContext("2d") as unknown as CanvasRenderingContext2D | null
 
 	if (!context) {
-		console.debug("[PDF]", "Could not get 2D context for canvas")
+		console.error("[PDF]", "Could not get 2D context for canvas")
 		return undefined;
 	}
 
