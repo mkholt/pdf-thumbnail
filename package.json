@@ -14,10 +14,14 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
+    "preversion": "yarn test",
+    "prepack": "yarn build",
+    
     "prebuild": "rimraf dist",
     "build": "tsc",
-    "prepack": "yarn build",
+    
     "postversion": "git push --tags && x-var yarn publish --access public --new-version $npm_package_version . && git push",
+    
     "test": "vitest",
     "test:coverage": "vitest --coverage"
   },
