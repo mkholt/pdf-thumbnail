@@ -1,7 +1,7 @@
 import { setupServer } from "msw/node"
 import { http, HttpResponse } from "msw"
 import fs from "fs";
-import { afterAll, beforeAll, afterEach, beforeEach } from "vitest";
+import { afterAll, beforeAll, afterEach } from "vitest";
 
 const sampleData = fs.readFileSync('tests/samples/sample.pdf')
 

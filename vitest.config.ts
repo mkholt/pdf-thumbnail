@@ -10,9 +10,24 @@ export default defineConfig({
 			include: ['src/**/*.ts','src/**/*.tsx'],
 			exclude: ['src/**/index.ts']
 		},
-		environmentMatchGlobs: [
-			['tests/**/*.tsx', 'jsdom']
-		],
-		setupFiles: ['tests/setup.http.ts']
+		setupFiles: ['tests/setup.http.ts'],
+		projects: [
+			{
+				extends: true,
+				test: {
+					name: 'node',
+					include: ['tests/**/*.test.ts'],
+					environment: 'node'
+				}
+			},
+			{
+				extends: true,
+				test: {
+					name: 'jsdom',
+					include: ['tests/**/*.test.tsx'],
+					environment: 'jsdom'
+				}
+			}
+		]
 	}
 })
