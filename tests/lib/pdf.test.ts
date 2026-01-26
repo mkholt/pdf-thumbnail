@@ -7,9 +7,10 @@ describe("PDF Thumbnail Creation Tests", () => {
 	test("Creating a thumbnail from a PDF", async () => {
 		const thumb = await createThumbnail("tests/samples/sample.pdf");
 		expect(thumb).toBeDefined();
-		expect(thumb).to.be.a("string");
-		expect(thumb?.length).toBeGreaterThan(0);
-		expect(thumb).toMatch(/^data:image\/png;base64,/);
+		expect(thumb?.thumbType).toBe("string");
+		expect(thumb?.thumbData).to.be.a("string");
+		expect(thumb?.thumbData?.length).toBeGreaterThan(0);
+		expect(thumb?.thumbData).toMatch(/^data:image\/png;base64,/);
 	});
 
 	test("Creating a thumbnail from a non-PDF", async () => {
@@ -20,8 +21,9 @@ describe("PDF Thumbnail Creation Tests", () => {
 	test("Creating a thumbnail with buffer output from a PDF", async () => {
 		const thumb = await createThumbnail("tests/samples/sample.pdf", true);
 		expect(thumb).toBeDefined();
-		expect(thumb).toBeInstanceOf(Buffer);
-		expect(thumb?.length).toBeGreaterThan(0);
+		expect(thumb?.thumbType).toBe("buffer");
+		expect(thumb?.thumbData).toBeInstanceOf(Buffer);
+		expect(thumb?.thumbData?.length).toBeGreaterThan(0);
 	});
 
 	test("Creating a thumbnail with buffer output from a non-PDF", async () => {
@@ -92,9 +94,26 @@ describe("PDF Thumbnail Creation Tests", () => {
 		expect(thumbnails).toHaveLength(2);
 		thumbnails.forEach((thumb, idx) => {
 			expect(thumb.thumbData).toBeDefined();
+			expect(thumb.thumbType).toBe("string");
 			expect(thumb.thumbData).to.be.a("string");
 			expect(thumb.thumbData?.length).toBeGreaterThan(0);
 			expect(thumb.thumbData).toMatch(/^data:image\/png;base64,/);
+			expect(thumb.file).toBe(files[idx].file);
+		});
+	});
+
+	test("Creating thumbnails with buffer output", async () => {
+		const files: FileData[] = [
+			{ file: "tests/samples/sample.pdf" },
+			{ file: "tests/samples/sample.pdf" }
+		];
+		const thumbnails = await createThumbnails(files, undefined, true);
+		expect(thumbnails).toHaveLength(2);
+		thumbnails.forEach((thumb, idx) => {
+			expect(thumb.thumbData).toBeDefined();
+			expect(thumb.thumbType).toBe("buffer");
+			expect(thumb.thumbData).toBeInstanceOf(Buffer);
+			expect(thumb.thumbData?.length).toBeGreaterThan(0);
 			expect(thumb.file).toBe(files[idx].file);
 		});
 	});
@@ -111,5 +130,10 @@ describe("PDF Thumbnail Creation Tests", () => {
 		expect(thumbnails[0].thumbData).toMatch(/^data:image\/png;base64,/);
 		expect(thumbnails[0].file).toBe(files[0].file);
 		expect(thumbnails[0].extra).toBe(files[0].extra);
+	});
+
+	test("Creating thumbnails from empty file array returns empty array", async () => {
+		const thumbnails = await createThumbnails([]);
+		expect(thumbnails).toEqual([]);
 	});
 })

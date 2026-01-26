@@ -15,8 +15,10 @@ export function useThumbnails<T extends FileData>(files: T[], prefix?: string): 
 	React.useEffect(() => {
 		if (!files.length) return;
 
-		createThumbnails(files, prefix)
-			.then(setThumbs);
+		(async () => {
+			const thumbs = await createThumbnails(files, prefix)
+			setThumbs(thumbs);
+		})();
 	}, [files, prefix])
 
 	return thumbs;
