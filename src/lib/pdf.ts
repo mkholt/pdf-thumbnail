@@ -4,17 +4,28 @@ import { isDefined } from "@mkholt/utilities"
 import { FileData, Thumbnail, StringThumbnail, BufferThumbnail } from "../types/index.js"
 
 /**
+ * Options for creating thumbnails
+ */
+export type CreateThumbnailsOptions = {
+	/** If provided, all filenames will be prefixed with the given string before fetching */
+	prefix?: string;
+	/** If `true` the thumbnails will be returned as `Buffer` objects, otherwise as base64 encoded dataURL strings */
+	toBuffer?: boolean;
+}
+
+/**
  * Given an array of files, creates thumbnails for each file and returns an array of data objects with the thumbnail data included
- * 
+ *
  * @param files The files to create thumbnails for
- * @param prefix If provided, all filenames will be prefixed with the given string before fetching
+ * @param options Options for thumbnail creation
  * @returns The files with the thumbnail data included
  */
-export async function createThumbnails<T extends FileData>(files: T[], prefix?: string): Promise<(T & StringThumbnail)[]>;
-export async function createThumbnails<T extends FileData>(files: T[], prefix: string | undefined, toBuffer: true): Promise<(T & BufferThumbnail)[]>;
-export async function createThumbnails<T extends FileData>(files: T[], prefix: string | undefined, toBuffer: false): Promise<(T & StringThumbnail)[]>;
-export async function createThumbnails<T extends FileData>(files: T[], prefix?: string, toBuffer?: boolean): Promise<(T & Thumbnail)[]> {
+export async function createThumbnails<T extends FileData>(files: T[], options?: { prefix?: string; toBuffer?: false }): Promise<(T & StringThumbnail)[]>;
+export async function createThumbnails<T extends FileData>(files: T[], options: { prefix?: string; toBuffer: true }): Promise<(T & BufferThumbnail)[]>;
+export async function createThumbnails<T extends FileData>(files: T[], options?: CreateThumbnailsOptions): Promise<(T & Thumbnail)[]> {
 	if (!files.length) return [];
+
+	const { prefix, toBuffer } = options ?? {};
 
 	const filePromises = files
 		.filter(d => d.file)

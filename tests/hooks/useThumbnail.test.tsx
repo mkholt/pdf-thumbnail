@@ -11,9 +11,9 @@ const THUMBDATA="data:image/png;base64,..."
 describe('useThumbnails hook', () => {
 	vi.mock("../../src/lib/index.js", () => {
 		return {
-			createThumbnails: vi.fn(async <T extends FileData>(files: T[], prefix?: string) => {
-				console.log("Mock called with", files, prefix);
-				return files.map((file) => ({ ...file, thumbData: THUMBDATA }));
+			createThumbnails: vi.fn(async <T extends FileData>(files: T[], options?: { prefix?: string }) => {
+				console.log("Mock called with", files, options);
+				return files.map((file) => ({ ...file, thumbType: "string" as const, thumbData: THUMBDATA }));
 			})
 		}
 	})
@@ -38,24 +38,24 @@ describe('useThumbnails hook', () => {
 		await waitFor(() => expect(result.current).toHaveLength(2));
 
 		expect(result.current).toEqual([
-			{ file: "samples/sample1.pdf", thumbData: THUMBDATA },
-			{ file: "samples/sample2.pdf", thumbData: THUMBDATA }
+			{ file: "samples/sample1.pdf", thumbType: "string", thumbData: THUMBDATA },
+			{ file: "samples/sample2.pdf", thumbType: "string", thumbData: THUMBDATA }
 		]);
 	});
 
 	it('should return an array of thumbnails with a prefix', async () => {
-		const { result } = renderHook(() => useThumbnails([{ file: "sample1.pdf" }, { file: "sample2.pdf" }], "samples/"));
+		const { result } = renderHook(() => useThumbnails([{ file: "sample1.pdf" }, { file: "sample2.pdf" }], { prefix: "samples/" }));
 		await waitFor(() => expect(result.current).toHaveLength(2));
 
 		expect(result.current).toEqual([
-			{ file: "sample1.pdf", thumbData: THUMBDATA },
-			{ file: "sample2.pdf", thumbData: THUMBDATA }
+			{ file: "sample1.pdf", thumbType: "string", thumbData: THUMBDATA },
+			{ file: "sample2.pdf", thumbType: "string", thumbData: THUMBDATA }
 		]);
 	});
 });
 
 const ThumbnailWrapper = ({ files, prefix }: { files: (FileData & { thumbData?: string })[], prefix?: string }) => {
-	const thumbs = useThumbnails(files, prefix);
+	const thumbs = useThumbnails(files, { prefix });
 
 	return (
 		<div data-testid="thumbnail-wrapper">
