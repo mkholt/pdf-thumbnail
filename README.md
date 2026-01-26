@@ -46,11 +46,14 @@ export type ThumbnailsProps = {
 	files: Data[]
 }
 export const Thumbnails = ({ files }: ThumbnailsProps) => {
-	const thumbs = useThumbnails(files)
+	const { thumbnails, isLoading, error } = useThumbnails(files)
+
+	if (isLoading) return <div>Loading thumbnails...</div>
+	if (error) return <div>Error: {error.message}</div>
 
 	return (
 		<div>
-			{thumbs.map(td => (
+			{thumbnails.map(td => (
 				<a key={td.file} href={`/files/${td.file}`} target="_blank">
 					<img src={td.thumbData} alt={td.name} />
 				</a>
@@ -86,6 +89,72 @@ export async function data(pageContext: PageContext) {
 - Generate thumbnails from PDF documents
 - Easy to use API
 - Supports outputting directly to a data URL or Buffer
+- Customizable scale and page selection
+- Progress callback for batch operations
+- AbortSignal support for cancellation
+- React hook with loading/error state
+
+## API
+
+### `createThumbnail(file, options?)`
+
+Creates a thumbnail for a single PDF file.
+
+```typescript
+const thumb = await createThumbnail("path/to/file.pdf", {
+	output: "string",  // "string" (default) or "buffer"
+	scale: 1,          // Scale factor (default: 1)
+	page: 1,           // Page number (default: 1)
+	signal: abortController.signal,  // Optional AbortSignal
+	logLevel: "error", // "silent" | "error" | "debug"
+});
+```
+
+### `createThumbnails(files, options?)`
+
+Creates thumbnails for multiple files.
+
+```typescript
+const thumbs = await createThumbnails(files, {
+	prefix: "public/",  // Prefix for file paths
+	scale: 0.5,         // Scale factor
+	page: 1,            // Page number
+	signal: abortController.signal,
+	onProgress: (completed, total) => {
+		console.log(`Progress: ${completed}/${total}`);
+	}
+});
+```
+
+### `useThumbnails(files, options?)` (React Hook)
+
+React hook for client-side thumbnail generation.
+
+```typescript
+const { thumbnails, isLoading, error } = useThumbnails(files, {
+	prefix: "/api/files/",
+	scale: 1,
+	page: 1,
+});
+```
+
+## Migration from v1 to v2
+
+### Breaking Change: `useThumbnails` return type
+
+In v1, `useThumbnails` returned an array of thumbnails directly:
+
+```typescript
+// v1
+const thumbnails = useThumbnails(files);
+```
+
+In v2, it returns an object with `thumbnails`, `isLoading`, and `error`:
+
+```typescript
+// v2
+const { thumbnails, isLoading, error } = useThumbnails(files);
+```
 
 ## Contributing
 

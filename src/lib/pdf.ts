@@ -20,6 +20,15 @@ export type CreateThumbnailOptions = {
 	 * - "debug": Verbose debug output
 	 */
 	logLevel?: LogLevel;
+
+	/** Scale factor for the thumbnail (default: 1). Higher values produce larger thumbnails. */
+	scale?: number;
+
+	/** Page number to create thumbnail from (default: 1). Clamped to valid range. */
+	page?: number;
+
+	/** AbortSignal to cancel the operation */
+	signal?: AbortSignal;
 }
 
 /**
@@ -28,6 +37,9 @@ export type CreateThumbnailOptions = {
 export type CreateThumbnailsOptions = CreateThumbnailOptions & {
 	/** If provided, all filenames will be prefixed with the given string before fetching */
 	prefix?: string;
+
+	/** Callback for progress updates during batch processing */
+	onProgress?: (completed: number, total: number) => void;
 }
 
 /**
@@ -42,16 +54,30 @@ export async function createThumbnails<T extends FileData>(files: T[], options?:
 export async function createThumbnails<T extends FileData>(files: T[], options?: CreateThumbnailsOptions): Promise<(T & Thumbnail)[]> {
 	if (!files.length) return [];
 
-	const { prefix, output, logLevel = "error" } = options ?? {};
+	const { prefix, output, logLevel = "error", scale, page, signal, onProgress } = options ?? {};
 
-	const filePromises = files
-		.filter(d => d.file)
-		.map(async (d) => {
-			const thumb = await createThumbnail(`${prefix ?? ""}${d.file}`, { output, logLevel });
-			return thumb
-				? { ...d, ...thumb } satisfies (T & Thumbnail)
-				: undefined;
-		});
+	if (signal?.aborted) {
+		return [];
+	}
+
+	const validFiles = files.filter(d => d.file);
+	const total = validFiles.length;
+	let completed = 0;
+
+	const filePromises = validFiles.map(async (d) => {
+		if (signal?.aborted) {
+			return undefined;
+		}
+
+		const thumb = await createThumbnail(`${prefix ?? ""}${d.file}`, { output, logLevel, scale, page, signal });
+
+		completed++;
+		onProgress?.(completed, total);
+
+		return thumb
+			? { ...d, ...thumb } satisfies (T & Thumbnail)
+			: undefined;
+	});
 
 	const thumbnails = await Promise.all(filePromises);
 	return thumbnails.filter(isDefined);
@@ -65,24 +91,58 @@ export async function createThumbnails<T extends FileData>(files: T[], options?:
 export async function createThumbnail(file: string, options: CreateThumbnailOptions & { output: "buffer" }): Promise<BufferThumbnail | undefined>;
 export async function createThumbnail(file: string, options?: CreateThumbnailOptions): Promise<StringThumbnail | undefined>;
 export async function createThumbnail(file: string, options?: CreateThumbnailOptions): Promise<StringThumbnail | BufferThumbnail | undefined> {
-	const { output, logLevel = "error" } = options ?? {};
+	const { output, logLevel = "error", scale = 1, page = 1, signal } = options ?? {};
 	const log = createLogger(logLevel);
-	
+
+	if (signal?.aborted) {
+		log.debug("Operation aborted before start");
+		return undefined;
+	}
+
 	try {
 		log.debug("Loading file", file)
-		const doc = await getDocument(file).promise
-		log.debug("PDF loaded,", doc.numPages, "page(s), getting page 1")
+		const loadingTask = getDocument(file);
 
-		const page = await doc.getPage(1)
+		// Set up abort handler if signal provided
+		const abortHandler = signal ? () => loadingTask.destroy() : undefined;
+		signal?.addEventListener('abort', abortHandler!);
+
+		let doc;
+		try {
+			doc = await loadingTask.promise;
+		} finally {
+			signal?.removeEventListener('abort', abortHandler!);
+		}
+
+		if (signal?.aborted) {
+			doc.destroy();
+			log.debug("Operation aborted after document load");
+			return undefined;
+		}
+
+		const pageToFetch = Math.max(1, Math.min(page, doc.numPages));
+		log.debug("PDF loaded,", doc.numPages, "page(s), getting page", pageToFetch)
+
+		const pageObj = await doc.getPage(pageToFetch)
+
+		if (signal?.aborted) {
+			doc.destroy();
+			log.debug("Operation aborted after page fetch");
+			return undefined;
+		}
 
 		const toBuffer = output === "buffer"
-		const pageThumb = await makeThumbOfPage(page, toBuffer, log)
+		const pageThumb = await makeThumbOfPage(pageObj, toBuffer, log, scale)
 
 		doc.destroy()
 
 		log.debug("Thumbnail created for", file, "of type", pageThumb?.thumbType)
 		return pageThumb
 	} catch (e: unknown) {
+		if (signal?.aborted) {
+			log.debug("Operation aborted:", file);
+			return undefined;
+		}
 		log.error("Error trying to make thumbnail of file", file)
 		log.error(e)
 	}
@@ -135,8 +195,8 @@ function getResult({canvas, type}: CanvasType, toBuffer: boolean, log: Logger): 
 	}
 }
 
-async function makeThumbOfPage(page: PDFPageProxy, toBuffer: boolean, log: Logger): Promise<StringThumbnail | BufferThumbnail | undefined> {
-	const viewport = page.getViewport({ scale: 1 })
+async function makeThumbOfPage(page: PDFPageProxy, toBuffer: boolean, log: Logger, scale: number = 1): Promise<StringThumbnail | BufferThumbnail | undefined> {
+	const viewport = page.getViewport({ scale })
 
 	const canvasInfo = await createCanvas(viewport.width, viewport.height)
 	const { canvas } = canvasInfo

@@ -5,26 +5,84 @@ import { createThumbnails } from "../lib/index.js";
 export type UseThumbnailsOptions = {
 	/** If provided, all filenames will be prefixed with the given string before fetching */
 	prefix?: string;
+
+	/** Scale factor for thumbnails (default: 1) */
+	scale?: number;
+
+	/** Page number to create thumbnail from (default: 1) */
+	page?: number;
+}
+
+export type UseThumbnailsResult<T extends FileData> = {
+	/** The generated thumbnails */
+	thumbnails: (T & StringThumbnail)[];
+
+	/** Whether thumbnails are currently being generated */
+	isLoading: boolean;
+
+	/** Error that occurred during generation, if any */
+	error: Error | null;
 }
 
 /**
- * Given an array of files, creates thumbnails for each file and returns an array of data objects with the thumbnail data included
+ * Given an array of files, creates thumbnails for each file and returns an object with the thumbnail data, loading state, and any error
  *
  * @param files Array of files to create thumbnails for
  * @param options Options for thumbnail creation
- * @returns An array of data objects with the thumbnail data included
+ * @returns An object containing thumbnails array, isLoading boolean, and error (if any)
  */
-export function useThumbnails<T extends FileData>(files: T[], options?: UseThumbnailsOptions): (T & StringThumbnail)[] {
-	const [thumbs, setThumbs] = React.useState<(T & StringThumbnail)[]>([])
+type State<T extends FileData> = {
+	thumbnails: (T & StringThumbnail)[];
+	isLoading: boolean;
+	error: Error | null;
+}
+
+export function useThumbnails<T extends FileData>(files: T[], options?: UseThumbnailsOptions): UseThumbnailsResult<T> {
+	const [state, setState] = React.useState<State<T>>({
+		thumbnails: [],
+		isLoading: false,
+		error: null,
+	});
 
 	React.useEffect(() => {
-		if (!files.length) return;
+		if (!files.length) {
+			// Only reset if we have data to clear
+			setState(prev => {
+				if (prev.thumbnails.length > 0 || prev.isLoading || prev.error) {
+					return { thumbnails: [], isLoading: false, error: null };
+				}
+				return prev;
+			});
+			return;
+		}
 
-		(async () => {
-			const thumbs = await createThumbnails(files, options)
-			setThumbs(thumbs);
-		})();
-	}, [files, options])
+		const abortController = new AbortController();
+		let isCancelled = false;
 
-	return thumbs;
+		setState(prev => ({ ...prev, isLoading: true, error: null }));
+
+		createThumbnails(files, {
+			...options,
+			signal: abortController.signal,
+		}).then(thumbs => {
+			if (!isCancelled) {
+				setState({ thumbnails: thumbs, isLoading: false, error: null });
+			}
+		}).catch(err => {
+			if (!isCancelled) {
+				setState(prev => ({
+					...prev,
+					isLoading: false,
+					error: err instanceof Error ? err : new Error(String(err)),
+				}));
+			}
+		});
+
+		return () => {
+			isCancelled = true;
+			abortController.abort();
+		};
+	}, [files, options?.prefix, options?.scale, options?.page]);
+
+	return state;
 }
