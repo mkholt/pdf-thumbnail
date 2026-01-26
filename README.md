@@ -38,7 +38,7 @@ export const Thumbnails = ({ files }: ThumbnailsProps) => {
 		<div>
 			{thumbs.map(td => (
 				<a key={td.file} href={`/files/${td.file}`} target="_blank">
-					<img src={d.thumbData} alt={td.name} />
+					<img src={td.thumbData} alt={td.name} />
 				</a>
 			))}
 		</div>

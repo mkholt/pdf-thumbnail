@@ -41,6 +41,9 @@ export async function createThumbnail(file: string, toBuffer: boolean | undefine
 		const page = await doc.getPage(1)
 
 		const pageThumb = await makeThumbOfPage(page, toBuffer)
+
+		doc.destroy()
+
 		console.debug("[PDF]", "Thumbnail created for", file, "of type", typeof pageThumb)
 		return pageThumb
 	} catch (e: unknown) {
