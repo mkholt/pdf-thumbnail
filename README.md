@@ -22,7 +22,21 @@ Yarn:
 yarn add @mkholt/pdf-thumbnail
 ```
 
+If you are running in node, `node-canvas` is a peer dependency, install it:
+
+NPM:
+```bash
+npm install canvas@3
+```
+
+Yarn:
+```bash
+yarn add canvas@3
+```
+
 ## Usage
+
+### Embedded client-side as thumbnail images
 
 ```typescript
 import { useThumbnails, FileData } from '@mkholt/pdf-thumbnail'
@@ -44,6 +58,27 @@ export const Thumbnails = ({ files }: ThumbnailsProps) => {
 		</div>
 	)
 }
+```
+
+### Embedded server-side by building images using node
+
+```typescript
+import { PageContext } from "vike/types";
+import { createThumbnails } from "@mkholt/pdf-thumbnail";
+
+export type Data = Awaited<ReturnType<typeof data>>
+export async function data(pageContext: PageContext) {
+	const { id } = pageContext.routeParams
+	const pageData = await import(`../../../data/${id}.mdx`) as MDXDocument<InfoPage>
+	const thumbnails = await createThumbnails(pageData.config.links ?? [], 'public/files/')
+
+	return {
+		pageId: id,
+		pageConfig: unit.config,
+		thumbnails
+	}
+}
+
 ```
 
 ## Features
