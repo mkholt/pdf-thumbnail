@@ -10,14 +10,14 @@ export default defineConfig({
 			include: ['src/**/*.ts','src/**/*.tsx'],
 			exclude: ['src/**/index.ts']
 		},
-		setupFiles: ['tests/setup.http.ts'],
 		projects: [
 			{
 				extends: true,
 				test: {
 					name: 'node',
 					include: ['tests/**/*.test.ts'],
-					environment: 'node'
+					environment: 'node',
+					setupFiles: ['tests/setup.http.ts']
 				}
 			},
 			{
@@ -25,7 +25,8 @@ export default defineConfig({
 				test: {
 					name: 'jsdom',
 					include: ['tests/**/*.test.tsx'],
-					environment: 'jsdom'
+					environment: 'jsdom',
+					setupFiles: ['tests/setup.http.ts', 'tests/setup.jsdom.ts']
 				}
 			}
 		]
