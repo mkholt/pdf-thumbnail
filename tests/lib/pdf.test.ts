@@ -107,7 +107,7 @@ describe("PDF Thumbnail Creation Tests", () => {
 			{ file: "tests/samples/sample.pdf" },
 			{ file: "tests/samples/sample.pdf" }
 		];
-		const thumbnails = await createThumbnails(files, { toBuffer: true });
+		const thumbnails = await createThumbnails(files, { output: "buffer" });
 		expect(thumbnails).toHaveLength(2);
 		thumbnails.forEach((thumb, idx) => {
 			expect(thumb.thumbData).toBeDefined();

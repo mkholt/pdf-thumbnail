@@ -9,8 +9,9 @@ import { FileData, Thumbnail, StringThumbnail, BufferThumbnail } from "../types/
 export type CreateThumbnailsOptions = {
 	/** If provided, all filenames will be prefixed with the given string before fetching */
 	prefix?: string;
-	/** If `true` the thumbnails will be returned as `Buffer` objects, otherwise as base64 encoded dataURL strings */
-	toBuffer?: boolean;
+
+	/** The output format of the thumbnails, either "string" for base64 encoded dataURL strings or "buffer" for Buffer objects */
+	output?: Thumbnail["thumbType"];
 }
 
 /**
@@ -20,17 +21,18 @@ export type CreateThumbnailsOptions = {
  * @param options Options for thumbnail creation
  * @returns The files with the thumbnail data included
  */
-export async function createThumbnails<T extends FileData>(files: T[], options?: { prefix?: string; toBuffer?: false }): Promise<(T & StringThumbnail)[]>;
-export async function createThumbnails<T extends FileData>(files: T[], options: { prefix?: string; toBuffer: true }): Promise<(T & BufferThumbnail)[]>;
+export async function createThumbnails<T extends FileData>(files: T[], options?: { prefix?: string; }): Promise<(T & StringThumbnail)[]>;
+export async function createThumbnails<T extends FileData>(files: T[], options?: { prefix?: string; output: "string" }): Promise<(T & StringThumbnail)[]>;
+export async function createThumbnails<T extends FileData>(files: T[], options: { prefix?: string; output: "buffer" }): Promise<(T & BufferThumbnail)[]>;
 export async function createThumbnails<T extends FileData>(files: T[], options?: CreateThumbnailsOptions): Promise<(T & Thumbnail)[]> {
 	if (!files.length) return [];
 
-	const { prefix, toBuffer } = options ?? {};
+	const { prefix, output } = options ?? {};
 
 	const filePromises = files
 		.filter(d => d.file)
 		.map(async (d) => {
-			const thumb = await createThumbnail(`${prefix ?? ""}${d.file}`, toBuffer);
+			const thumb = await createThumbnail(`${prefix ?? ""}${d.file}`, output == "buffer");
 			return thumb
 				? { ...d, ...thumb } satisfies (T & Thumbnail)
 				: undefined;
