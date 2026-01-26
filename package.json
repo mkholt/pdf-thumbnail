@@ -23,7 +23,8 @@
     "build": "tsc",
     "postversion": "git push --tags && x-var yarn publish --access public --new-version $npm_package_version . && git push",
     "test": "vitest",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "type-check": "tsc --noEmit"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.0",
