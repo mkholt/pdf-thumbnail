@@ -19,7 +19,7 @@ describe("PDF Thumbnail Creation Tests", () => {
 	});
 
 	test("Creating a thumbnail with buffer output from a PDF", async () => {
-		const thumb = await createThumbnail("tests/samples/sample.pdf", true);
+		const thumb = await createThumbnail("tests/samples/sample.pdf", { output: "buffer" });
 		expect(thumb).toBeDefined();
 		expect(thumb?.thumbType).toBe("buffer");
 		expect(thumb?.thumbData).toBeInstanceOf(Buffer);
@@ -27,7 +27,7 @@ describe("PDF Thumbnail Creation Tests", () => {
 	});
 
 	test("Creating a thumbnail with buffer output from a non-PDF", async () => {
-		const thumb = await createThumbnail("tests/samples/sample.jpg", true);
+		const thumb = await createThumbnail("tests/samples/sample.jpg", { output: "buffer" });
 		expect(thumb).toBeUndefined();
 	});
 
@@ -37,7 +37,7 @@ describe("PDF Thumbnail Creation Tests", () => {
 	});
 
 	test("Creating a thumbnail with buffer output from a non-existent file", async () => {
-		const thumb = await createThumbnail("tests/nonexistent.pdf", true);
+		const thumb = await createThumbnail("tests/nonexistent.pdf", { output: "buffer" });
 		expect(thumb).toBeUndefined();
 	});
 

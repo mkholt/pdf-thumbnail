@@ -12,7 +12,7 @@ describe("PDF thumbnail creation using HTMLCanvasElement", () => {
 	});
 
 	test("Creating a thumbnail with buffer output from a PDF", async () => {
-		const thumb = await createThumbnail("http://localhost:3000/samples/sample.pdf", true);
+		const thumb = await createThumbnail("http://localhost:3000/samples/sample.pdf", { output: "buffer" });
 		expect(thumb).toBeDefined();
 		expect(thumb?.thumbType).toBe("buffer");
 		expect(thumb?.thumbData).toBeInstanceOf(Buffer);

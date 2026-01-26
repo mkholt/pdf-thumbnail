@@ -2,16 +2,32 @@ import { getDocument, type PDFPageProxy } from "pdfjs-dist/legacy/build/pdf.mjs"
 import "pdfjs-dist/legacy/build/pdf.worker.mjs"
 import { isDefined } from "@mkholt/utilities"
 import { FileData, Thumbnail, StringThumbnail, BufferThumbnail } from "../types/index.js"
+import { createLogger, type Logger, type LogLevel } from "./logging.js"
+
+export type { LogLevel } from "./logging.js"
 
 /**
- * Options for creating thumbnails
+ * Options for creating a single thumbnail
  */
-export type CreateThumbnailsOptions = {
+export type CreateThumbnailOptions = {
+	/** The output format: "string" for base64 dataURL (default) or "buffer" for Buffer */
+	output?: Thumbnail["thumbType"];
+
+	/**
+	 * Controls logging verbosity:
+	 * - "silent": No logging
+	 * - "error": Only errors (default)
+	 * - "debug": Verbose debug output
+	 */
+	logLevel?: LogLevel;
+}
+
+/**
+ * Options for creating multiple thumbnails
+ */
+export type CreateThumbnailsOptions = CreateThumbnailOptions & {
 	/** If provided, all filenames will be prefixed with the given string before fetching */
 	prefix?: string;
-
-	/** The output format of the thumbnails, either "string" for base64 encoded dataURL strings or "buffer" for Buffer objects */
-	output?: Thumbnail["thumbType"];
 }
 
 /**
@@ -21,18 +37,17 @@ export type CreateThumbnailsOptions = {
  * @param options Options for thumbnail creation
  * @returns The files with the thumbnail data included
  */
-export async function createThumbnails<T extends FileData>(files: T[], options?: { prefix?: string; }): Promise<(T & StringThumbnail)[]>;
-export async function createThumbnails<T extends FileData>(files: T[], options?: { prefix?: string; output: "string" }): Promise<(T & StringThumbnail)[]>;
-export async function createThumbnails<T extends FileData>(files: T[], options: { prefix?: string; output: "buffer" }): Promise<(T & BufferThumbnail)[]>;
+export async function createThumbnails<T extends FileData>(files: T[], options: CreateThumbnailsOptions & { output: "buffer" }): Promise<(T & BufferThumbnail)[]>;
+export async function createThumbnails<T extends FileData>(files: T[], options?: CreateThumbnailsOptions): Promise<(T & StringThumbnail)[]>;
 export async function createThumbnails<T extends FileData>(files: T[], options?: CreateThumbnailsOptions): Promise<(T & Thumbnail)[]> {
 	if (!files.length) return [];
 
-	const { prefix, output } = options ?? {};
+	const { prefix, output, logLevel = "error" } = options ?? {};
 
 	const filePromises = files
 		.filter(d => d.file)
 		.map(async (d) => {
-			const thumb = await createThumbnail(`${prefix ?? ""}${d.file}`, output == "buffer");
+			const thumb = await createThumbnail(`${prefix ?? ""}${d.file}`, { output, logLevel });
 			return thumb
 				? { ...d, ...thumb } satisfies (T & Thumbnail)
 				: undefined;
@@ -45,29 +60,31 @@ export async function createThumbnails<T extends FileData>(files: T[], options?:
 /**
  * Creates a thumbnail for a given PDF file
  * @param file The file to create a thumbnail for
- * @param toBuffer If `true` the thumbnail will be returned as a `Buffer` object, otherwise it will be returned as a base64 encoded dataURL string
+ * @param options Options for thumbnail creation
  */
-export async function createThumbnail(file: string): Promise<StringThumbnail | undefined>;
-export async function createThumbnail(file: string, toBuffer: true): Promise<BufferThumbnail | undefined>;
-export async function createThumbnail(file: string, toBuffer: false): Promise<StringThumbnail | undefined>;
-export async function createThumbnail(file: string, toBuffer?: boolean): Promise<StringThumbnail | BufferThumbnail | undefined>;
-export async function createThumbnail(file: string, toBuffer: boolean | undefined = false): Promise<StringThumbnail | BufferThumbnail | undefined> {
+export async function createThumbnail(file: string, options: CreateThumbnailOptions & { output: "buffer" }): Promise<BufferThumbnail | undefined>;
+export async function createThumbnail(file: string, options?: CreateThumbnailOptions): Promise<StringThumbnail | undefined>;
+export async function createThumbnail(file: string, options?: CreateThumbnailOptions): Promise<StringThumbnail | BufferThumbnail | undefined> {
+	const { output, logLevel = "error" } = options ?? {};
+	const log = createLogger(logLevel);
+	
 	try {
-		console.debug("[PDF]", "Loading file", file)
+		log.debug("Loading file", file)
 		const doc = await getDocument(file).promise
-		console.debug("[PDF]", "PDF loaded,", doc.numPages, "page(s)")
+		log.debug("PDF loaded,", doc.numPages, "page(s), getting page 1")
 
 		const page = await doc.getPage(1)
 
-		const pageThumb = await makeThumbOfPage(page, toBuffer)
+		const toBuffer = output === "buffer"
+		const pageThumb = await makeThumbOfPage(page, toBuffer, log)
 
 		doc.destroy()
 
-		console.debug("[PDF]", "Thumbnail created for", file, "of type", typeof pageThumb)
+		log.debug("Thumbnail created for", file, "of type", pageThumb?.thumbType)
 		return pageThumb
 	} catch (e: unknown) {
-		console.error("Error trying to make thumbnail of file", file)
-		console.error(e)
+		log.error("Error trying to make thumbnail of file", file)
+		log.error(e)
 	}
 }
 
@@ -97,8 +114,8 @@ async function createCanvas(width: number, height: number): Promise<CanvasType> 
 	}
 }
 
-function getResult({canvas, type}: CanvasType, toBuffer: boolean): StringThumbnail | BufferThumbnail {
-	console.debug("[PDF]", "Page rendered to canvas of type", type)
+function getResult({canvas, type}: CanvasType, toBuffer: boolean, log: Logger): StringThumbnail | BufferThumbnail {
+	log.debug("Page rendered to canvas of type", type)
 	const dataUrl = canvas.toDataURL("image/png");
 
 	if (type === "node") {
@@ -123,18 +140,18 @@ function getResult({canvas, type}: CanvasType, toBuffer: boolean): StringThumbna
 	}
 }
 
-async function makeThumbOfPage(page: PDFPageProxy, toBuffer: boolean): Promise<StringThumbnail | BufferThumbnail | undefined> {
+async function makeThumbOfPage(page: PDFPageProxy, toBuffer: boolean, log: Logger): Promise<StringThumbnail | BufferThumbnail | undefined> {
 	const viewport = page.getViewport({ scale: 1 })
 
 	const canvasInfo = await createCanvas(viewport.width, viewport.height)
 	const { canvas } = canvasInfo
 
-	console.debug("[PDF]", "Rendering page", page.pageNumber, "to canvas", canvas.width, "x", canvas.height)
+	log.debug("Rendering page", page.pageNumber, "to canvas", canvas.width, "x", canvas.height)
 
 	await page.render({
 		viewport,
 		canvas: canvas as unknown as HTMLCanvasElement
 	}).promise
 
-	return getResult(canvasInfo, toBuffer)
+	return getResult(canvasInfo, toBuffer, log)
 }
