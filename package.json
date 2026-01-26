@@ -51,6 +51,6 @@
   },
   "dependencies": {
     "@mkholt/utilities": "^1.0.2",
-    "pdfjs-dist": "4.x"
+    "pdfjs-dist": "5"
   }
 }

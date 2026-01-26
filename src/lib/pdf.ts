@@ -91,21 +91,14 @@ async function makeThumbOfPage(page: PDFPageProxy, toBuffer: boolean): Promise<s
 
 	const canvasInfo = await createCanvas(viewport.width, viewport.height)
 	const { canvas, type } = canvasInfo
-	const context = canvas.getContext("2d") as unknown as CanvasRenderingContext2D | null
-
-	if (!context) {
-		console.error("[PDF]", "Could not get 2D context for canvas")
-		return undefined;
-	}
 
 	console.debug("[PDF]", "Rendering page", page.pageNumber, "to canvas", canvas.width, "x", canvas.height)
 
 	await page.render({
-		canvasContext: context,
-		viewport
+		viewport,
+		canvas: canvas as unknown as HTMLCanvasElement
 	}).promise
 
 	console.debug("[PDF]", "Page rendered to canvas of type", type)
 	return getResult(canvasInfo, toBuffer)
 }
-

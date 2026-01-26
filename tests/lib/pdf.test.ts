@@ -112,24 +112,4 @@ describe("PDF Thumbnail Creation Tests", () => {
 		expect(thumbnails[0].file).toBe(files[0].file);
 		expect(thumbnails[0].extra).toBe(files[0].extra);
 	});
-
-	test("Fails if no 2D context", async () => {
-		const files = [ { file: "tests/samples/sample.pdf" } ];
-
-		vi.doMock("canvas", () => {
-			return {
-				createCanvas: () => {
-					return {
-						getContext: () => null
-					}
-				}
-			}
-		})
-
-		const errorSpy = vi.spyOn(console, "error");
-
-		const thumbnails = await createThumbnails(files);
-		expect(thumbnails).toHaveLength(0);
-		expect(errorSpy).toHaveBeenCalledWith("[PDF]", "Could not get 2D context for canvas")
-	})
 })
