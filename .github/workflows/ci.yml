@@ -22,9 +22,6 @@ jobs:
         - name: Install dependencies
           run: yarn install --immutable
 
-        - name: Type check
-          run: yarn type-check
-
         - name: Run tests
           run: yarn test:coverage
 

@@ -118,25 +118,20 @@ function getResult({canvas, type}: CanvasType, toBuffer: boolean, log: Logger): 
 	log.debug("Page rendered to canvas of type", type)
 	const dataUrl = canvas.toDataURL("image/png");
 
-	if (type === "node") {
-		return toBuffer
-			? {
-				thumbType: "buffer",
-				thumbData: canvas.toBuffer("image/png")
-			} : {
-				thumbType: "string",
-				thumbData: dataUrl
-			};
+	if (toBuffer) {
+		const thumbData = type === "node"
+			? canvas.toBuffer("image/png")
+			: Buffer.from(dataUrl.split(",")[1], "base64");
+
+		return {
+			thumbType: "buffer",
+			thumbData
+		};
 	} else {
-		const base64 = dataUrl.split(",")[1];
-		return toBuffer
-			? {
-				thumbType: "buffer",
-				thumbData: Buffer.from(base64, "base64")
-			} : {
-				thumbType: "string",
-				thumbData: dataUrl
-			};
+		return {
+			thumbType: "string",
+			thumbData: dataUrl
+		}
 	}
 }
 

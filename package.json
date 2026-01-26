@@ -22,7 +22,9 @@
     "prebuild": "rimraf dist",
     "build": "tsc",
     "postversion": "git push --tags && x-var yarn publish --access public --new-version $npm_package_version . && git push",
+    "pretest": "yarn type-check",
     "test": "vitest",
+    "pretest:coverage": "yarn type-check",
     "test:coverage": "vitest --coverage",
     "type-check": "tsc --noEmit"
   },
