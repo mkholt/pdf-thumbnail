@@ -1,6 +1,6 @@
 {
   "name": "@mkholt/pdf-thumbnail",
-  "version": "1.0.3",
+  "version": "2.0.0",
   "description": "React wrapper around PDF-js allowing creation of thumbnails both server and client side",
   "main": "dist/index.js",
   "engines": {
