@@ -1,6 +1,6 @@
 # PDF Thumbnail Library
 
-[![npm](https://img.shields.io/npm/v/pdf-thumbnail)](https://www.npmjs.com/@mkholt/pdf-thumbnail)
+[![npm](https://img.shields.io/npm/v/@mkholt/pdf-thumbnail)](https://www.npmjs.com/@mkholt/pdf-thumbnail)
 [![codecov](https://img.shields.io/codecov/c/github/mkholt/pdf-thumbnail)](https://app.codecov.io/github/mkholt/pdf-thumbnail)
 [![TypeScript](https://img.shields.io/badge/%3C%2F%3E-TypeScript-%230074c1.svg)](http://www.typescriptlang.org/)
 
