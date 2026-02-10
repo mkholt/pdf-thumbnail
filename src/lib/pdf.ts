@@ -1,8 +1,7 @@
-import { getDocument, type PDFPageProxy } from "pdfjs-dist/legacy/build/pdf.mjs"
-import "pdfjs-dist/legacy/build/pdf.worker.mjs"
+import { renderPageAsImage, getDocumentProxy } from "unpdf"
 import { isDefined } from "@mkholt/utilities"
 import { FileData, Thumbnail, StringThumbnail, BufferThumbnail } from "../types/index.js"
-import { createLogger, type Logger, type LogLevel } from "./logging.js"
+import { createLogger, type LogLevel } from "./logging.js"
 
 export type { LogLevel } from "./logging.js"
 
@@ -101,44 +100,47 @@ export async function createThumbnail(file: string, options?: CreateThumbnailOpt
 
 	try {
 		log.debug("Loading file", file)
-		const CanvasFactory = isNode ? buildNodeCanvasFactoryClass(await getCanvasModule()) : undefined
-		const loadingTask = getDocument({ url: file, CanvasFactory });
-
-		// Set up abort handler if signal provided
-		const abortHandler = signal ? () => loadingTask.destroy() : undefined;
-		signal?.addEventListener('abort', abortHandler!);
-
-		let doc;
-		try {
-			doc = await loadingTask.promise;
-		} finally {
-			signal?.removeEventListener('abort', abortHandler!);
-		}
+		const pdfData = await loadPdfData(file, signal)
 
 		if (signal?.aborted) {
-			doc.destroy();
 			log.debug("Operation aborted after document load");
 			return undefined;
 		}
 
+		const doc = await getDocumentProxy(new Uint8Array(pdfData))
 		const pageToFetch = Math.max(1, Math.min(page, doc.numPages));
 		log.debug("PDF loaded,", doc.numPages, "page(s), getting page", pageToFetch)
-
-		const pageObj = await doc.getPage(pageToFetch)
+		doc.destroy()
 
 		if (signal?.aborted) {
-			doc.destroy();
 			log.debug("Operation aborted after page fetch");
 			return undefined;
 		}
 
-		const toBuffer = output === "buffer"
-		const pageThumb = await makeThumbOfPage(pageObj, toBuffer, log, scale)
+		const canvasImport = isNodeRuntime ? () => import("@napi-rs/canvas") : undefined
 
-		doc.destroy()
+		if (output === "buffer") {
+			const arrayBuffer = await renderPageAsImage(new Uint8Array(pdfData), pageToFetch, {
+				canvasImport,
+				scale
+			})
+			log.debug("Thumbnail created for", file, "of type", "buffer")
+			return {
+				thumbType: "buffer",
+				thumbData: Buffer.from(arrayBuffer)
+			}
+		}
 
-		log.debug("Thumbnail created for", file, "of type", pageThumb?.thumbType)
-		return pageThumb
+		const dataUrl = await renderPageAsImage(new Uint8Array(pdfData), pageToFetch, {
+			canvasImport,
+			scale,
+			toDataURL: true
+		})
+		log.debug("Thumbnail created for", file, "of type", "string")
+		return {
+			thumbType: "string",
+			thumbData: dataUrl
+		}
 	} catch (e: unknown) {
 		if (signal?.aborted) {
 			log.debug("Operation aborted:", file);
@@ -149,107 +151,32 @@ export async function createThumbnail(file: string, options?: CreateThumbnailOpt
 	}
 }
 
-type CanvasType = {
-	type: 'html'
-	canvas: HTMLCanvasElement
-} | {
-	type: 'node'
-	canvas: import("canvas").Canvas
-}
+const isNodeRuntime = typeof process !== "undefined" && !!process.versions?.node
 
-const isNode = typeof document === "undefined"
-
-/**
- * Lazily loaded canvas module for Node.js environments.
- * Cached to avoid repeated dynamic imports.
- */
-let canvasModule: typeof import("canvas") | undefined
-
-async function getCanvasModule() {
-	if (!canvasModule) {
-		canvasModule = await import("canvas")
-	}
-	return canvasModule
-}
-
-/**
- * Custom CanvasFactory for pdfjs-dist that uses the `canvas` npm package.
- * This ensures pdfjs-dist's internal temporary canvases (used for inline images,
- * scaling, etc.) are compatible with the main rendering canvas.
- *
- * Without this, pdfjs-dist defaults to its built-in NodeCanvasFactory which
- * requires @napi-rs/canvas, causing type mismatches with the canvas package.
- */
-function buildNodeCanvasFactoryClass(canvasMod: typeof import("canvas")) {
-	return class NodeCanvasFactory {
-		create(width: number, height: number) {
-			const canvas = canvasMod.createCanvas(width, height)
-			return { canvas, context: canvas.getContext("2d") }
-		}
-		reset(canvasAndContext: Record<string, unknown>, width: number, height: number) {
-			(canvasAndContext.canvas as import("canvas").Canvas).width = width;
-			(canvasAndContext.canvas as import("canvas").Canvas).height = height
-		}
-		destroy(canvasAndContext: Record<string, unknown>) {
-			(canvasAndContext.canvas as import("canvas").Canvas).width = 0;
-			(canvasAndContext.canvas as import("canvas").Canvas).height = 0
-			canvasAndContext.canvas = null
-			canvasAndContext.context = null
-		}
-	}
-}
-
-async function createCanvas(width: number, height: number): Promise<CanvasType> {
-	if (!isNode) {
-		const canvas = document.createElement("canvas")
-		canvas.width = width
-		canvas.height = height
-		return {
-			type: 'html',
-			canvas
-		}
+async function loadPdfData(file: string, signal?: AbortSignal): Promise<Uint8Array> {
+	if (isNodeRuntime && !isUrl(file)) {
+		const { readFile } = await import("fs/promises")
+		return new Uint8Array(await readFile(file))
 	}
 
-	const mod = await getCanvasModule()
-	return {
-		type: 'node',
-		canvas: mod.createCanvas(width, height)
+	const response = await fetch(file, { signal })
+	if (!response.ok) {
+		throw new Error(`Failed to load PDF from "${file}": ${response.status} ${response.statusText}`)
 	}
+	return new Uint8Array(await response.arrayBuffer())
 }
 
-function getResult({canvas, type}: CanvasType, toBuffer: boolean, log: Logger): StringThumbnail | BufferThumbnail {
-	log.debug("Page rendered to canvas of type", type)
-	const dataUrl = canvas.toDataURL("image/png");
-
-	if (toBuffer) {
-		const thumbData = type === "node"
-			? canvas.toBuffer("image/png")
-			: Buffer.from(dataUrl.split(",")[1], "base64");
-
-		return {
-			thumbType: "buffer",
-			thumbData
-		};
-	} else {
-		return {
-			thumbType: "string",
-			thumbData: dataUrl
-		}
+function isUrl(str: string): boolean {
+	try {
+		const url = new URL(str)
+		return (
+			url.protocol === "http:" ||
+			url.protocol === "https:" ||
+			url.protocol === "data:" ||
+			url.protocol === "blob:" ||
+			url.protocol === "file:"
+		)
+	} catch {
+		return false
 	}
-}
-
-async function makeThumbOfPage(page: PDFPageProxy, toBuffer: boolean, log: Logger, scale: number = 1): Promise<StringThumbnail | BufferThumbnail | undefined> {
-	const viewport = page.getViewport({ scale })
-
-	const canvasInfo = await createCanvas(viewport.width, viewport.height)
-	const { canvas } = canvasInfo
-
-	log.debug("Rendering page", page.pageNumber, "to canvas", canvas.width, "x", canvas.height)
-
-	await page.render({
-		viewport,
-		canvas: canvas as unknown as HTMLCanvasElement
-	}).promise
-
-	return getResult(canvasInfo, toBuffer, log)
 }

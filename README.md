@@ -22,17 +22,19 @@ Yarn:
 yarn add @mkholt/pdf-thumbnail
 ```
 
-If you are running in node, `node-canvas` is a peer dependency, install it:
+If you are running in Node.js, `@napi-rs/canvas` is needed for rendering:
 
 NPM:
 ```bash
-npm install canvas@3
+npm install @napi-rs/canvas
 ```
 
 Yarn:
 ```bash
-yarn add canvas@3
+yarn add @napi-rs/canvas
 ```
+
+This is not needed for browser-only usage, where the native canvas is used automatically.
 
 ## Usage
 
@@ -73,7 +75,7 @@ export type Data = Awaited<ReturnType<typeof data>>
 export async function data(pageContext: PageContext) {
 	const { id } = pageContext.routeParams
 	const pageData = await import(`../../../data/${id}.mdx`) as MDXDocument<InfoPage>
-	const thumbnails = await createThumbnails(pageData.config.links ?? [], 'public/files/')
+	const thumbnails = await createThumbnails(pageData.config.links ?? [], { prefix: 'public/files/' })
 
 	return {
 		pageId: id,
@@ -137,6 +139,26 @@ const { thumbnails, isLoading, error } = useThumbnails(files, {
 	page: 1,
 });
 ```
+
+## Migration from v2 to v3
+
+### Breaking Change: Canvas peer dependency
+
+The `canvas` (node-canvas) peer dependency has been replaced with `@napi-rs/canvas`. This eliminates the need for node-gyp and native build tools.
+
+```bash
+# Remove the old dependency
+npm uninstall canvas
+
+# Install the new one
+npm install @napi-rs/canvas
+```
+
+No code changes are needed — the public API is unchanged.
+
+### Node.js version
+
+The minimum Node.js version is now 18 (was `^18.12.0 || >=20.9.0`). The restrictive version range from v2 was due to node-canvas binary availability and no longer applies.
 
 ## Migration from v1 to v2
 

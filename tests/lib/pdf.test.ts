@@ -1,20 +1,19 @@
-import { expect, test, vi } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { createThumbnail, createThumbnails } from "../../src/lib/pdf.js";
 import { FileData } from "../../src/types/index.js";
-import { describe } from "node:test";
 
 /**
  * Creates a mock AbortSignal that becomes aborted after a specified number of checks.
  * Useful for deterministically testing abort behavior at specific points in the code.
  *
  * For createThumbnail:
- * - abortAfterChecks=1: aborts before start (line 97)
- * - abortAfterChecks=2: aborts after document load (line 117)
- * - abortAfterChecks=3: aborts after page fetch (line 128)
+ * - abortAfterChecks=1: aborts before start (line 96)
+ * - abortAfterChecks=2: aborts after PDF data load (line 105)
+ * - abortAfterChecks=3: aborts after page count fetch (line 115)
  *
  * For createThumbnails:
- * - abortAfterChecks=1: aborts at early check (line 59)
- * - abortAfterChecks=2: aborts in map iteration (line 68)
+ * - abortAfterChecks=1: aborts at early check (line 58)
+ * - abortAfterChecks=2: aborts in map iteration (line 67)
  */
 function createMockSignal(abortAfterChecks: number): AbortSignal {
 	let checkCount = 0;
@@ -65,6 +64,11 @@ describe("PDF Thumbnail Creation Tests", () => {
 
 	test("Creating a thumbnail from a non-existent file", async () => {
 		const thumb = await createThumbnail("tests/nonexistent.pdf");
+		expect(thumb).toBeUndefined();
+	});
+
+	test("Creating a thumbnail from a URL with unsupported protocol returns undefined", async () => {
+		const thumb = await createThumbnail("ftp://example.com/sample.pdf");
 		expect(thumb).toBeUndefined();
 	});
 
@@ -310,7 +314,7 @@ describe("PDF Thumbnail Creation Tests", () => {
 	});
 
 	test("Abort after document load returns undefined", async () => {
-		// abortAfterChecks=2: passes early check (line 97), aborts after doc load (line 117)
+		// abortAfterChecks=2: passes early check (line 96), aborts after PDF data load (line 105)
 		const thumb = await createThumbnail("tests/samples/sample.pdf", {
 			signal: createMockSignal(2)
 		});
@@ -318,15 +322,24 @@ describe("PDF Thumbnail Creation Tests", () => {
 	});
 
 	test("Abort after page fetch returns undefined", async () => {
-		// abortAfterChecks=3: passes early check and doc load, aborts after page fetch (line 128)
+		// abortAfterChecks=3: passes early check and data load, aborts after page count fetch (line 115)
 		const thumb = await createThumbnail("tests/samples/sample.pdf", {
 			signal: createMockSignal(3)
 		});
 		expect(thumb).toBeUndefined();
 	});
 
+	test("Abort during error in catch block returns undefined", async () => {
+		// abortAfterChecks=2: passes early check (line 96), loadPdfData throws ENOENT
+		// for non-existent file, catch block sees signal as aborted on 2nd check (line 145)
+		const thumb = await createThumbnail("tests/samples/nonexistent.pdf", {
+			signal: createMockSignal(2)
+		});
+		expect(thumb).toBeUndefined();
+	});
+
 	test("createThumbnails aborts individual file processing when signal changes mid-iteration", async () => {
-		// abortAfterChecks=2: passes early check (line 59), aborts in map iteration (line 68)
+		// abortAfterChecks=2: passes early check (line 58), aborts in map iteration (line 67)
 		const files: FileData[] = [
 			{ file: "tests/samples/sample.pdf" },
 			{ file: "tests/samples/sample.pdf" },
