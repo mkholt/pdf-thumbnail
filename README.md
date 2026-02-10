@@ -96,6 +96,14 @@ export async function data(pageContext: PageContext) {
 - AbortSignal support for cancellation
 - React hook with loading/error state
 
+## Security Considerations
+
+This library processes file paths and URLs as provided. When using it with untrusted input, be aware of:
+
+- **Path traversal**: File paths are passed directly to `fs.readFile` in Node.js. Never pass unsanitized user input as a file path.
+- **SSRF**: URLs are fetched with `fetch()`. If user input controls the URL, an attacker could reach internal services. Validate or restrict URLs before passing them to this library.
+- **Resource limits**: There are no built-in limits on PDF file size or rendered image dimensions. Use the `concurrency` option to limit parallel processing, and validate file sizes before processing untrusted PDFs.
+
 ## API
 
 ### `createThumbnail(file, options?)`

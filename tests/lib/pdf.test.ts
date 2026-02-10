@@ -331,6 +331,79 @@ describe("PDF Thumbnail Creation Tests", () => {
 		expect(thumbnails[0].thumbData).toBeDefined();
 	});
 
+	test("Creating thumbnails with onError callback reports failed files", async () => {
+		const errorFiles: string[] = [];
+		const files: FileData[] = [
+			{ file: "tests/samples/sample.pdf" },
+			{ file: "tests/samples/nonexistent.pdf" },
+			{ file: "tests/samples/sample.jpg" },
+		];
+
+		const thumbnails = await createThumbnails(files, {
+			onError: (file) => errorFiles.push(file),
+		});
+
+		expect(thumbnails).toHaveLength(1);
+		expect(errorFiles).toEqual(["tests/samples/nonexistent.pdf", "tests/samples/sample.jpg"]);
+	});
+
+	test("Creating thumbnails with onError and prefix reports resolved file path", async () => {
+		const errorFiles: string[] = [];
+		const files: FileData[] = [{ file: "nonexistent.pdf" }];
+
+		await createThumbnails(files, {
+			prefix: "tests/samples/",
+			onError: (file) => errorFiles.push(file),
+		});
+
+		expect(errorFiles).toEqual(["tests/samples/nonexistent.pdf"]);
+	});
+
+	test("Creating thumbnails without onError still works", async () => {
+		const files: FileData[] = [
+			{ file: "tests/samples/sample.pdf" },
+			{ file: "tests/samples/nonexistent.pdf" },
+		];
+
+		const thumbnails = await createThumbnails(files);
+		expect(thumbnails).toHaveLength(1);
+	});
+
+	test("Creating thumbnails with concurrency: 1 processes files sequentially", async () => {
+		const order: string[] = [];
+		const files: FileData[] = [
+			{ file: "tests/samples/sample.pdf" },
+			{ file: "tests/samples/sample.pdf" },
+			{ file: "tests/samples/sample.pdf" },
+		];
+
+		const thumbnails = await createThumbnails(files, {
+			concurrency: 1,
+			onProgress: (completed) => {
+				order.push(`done-${completed}`);
+			}
+		});
+
+		expect(thumbnails).toHaveLength(3);
+		expect(order).toEqual(["done-1", "done-2", "done-3"]);
+	});
+
+	test("Creating thumbnails with concurrency: 2 processes all files", async () => {
+		const files: FileData[] = [
+			{ file: "tests/samples/sample.pdf" },
+			{ file: "tests/samples/sample.pdf" },
+			{ file: "tests/samples/sample.pdf" },
+			{ file: "tests/samples/sample.pdf" },
+		];
+
+		const thumbnails = await createThumbnails(files, { concurrency: 2 });
+
+		expect(thumbnails).toHaveLength(4);
+		thumbnails.forEach(thumb => {
+			expect(thumb.thumbData).toMatch(/^data:image\/png;base64,/);
+		});
+	});
+
 	test("Abort after document load returns undefined", async () => {
 		// abortAfterChecks=2: passes early check (line 96), aborts after PDF data load (line 105)
 		const thumb = await createThumbnail("tests/samples/sample.pdf", {
