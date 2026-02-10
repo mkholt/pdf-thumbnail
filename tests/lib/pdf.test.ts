@@ -38,6 +38,13 @@ describe("PDF Thumbnail Creation Tests", () => {
 		expect(thumb?.thumbData).toMatch(/^data:image\/png;base64,/);
 	});
 
+	test("Creating a thumbnail from a PDF with embedded images", async () => {
+		const thumb = await createThumbnail("tests/samples/pdf-with-images.pdf");
+		expect(thumb).toBeDefined();
+		expect(thumb?.thumbType).toBe("string");
+		expect(thumb?.thumbData).toMatch(/^data:image\/png;base64,/);
+	});
+
 	test("Creating a thumbnail from a non-PDF", async () => {
 		const thumb = await createThumbnail("tests/samples/sample.jpg");
 		expect(thumb).toBeUndefined();

@@ -101,7 +101,8 @@ export async function createThumbnail(file: string, options?: CreateThumbnailOpt
 
 	try {
 		log.debug("Loading file", file)
-		const loadingTask = getDocument(file);
+		const CanvasFactory = isNode ? buildNodeCanvasFactoryClass(await getCanvasModule()) : undefined
+		const loadingTask = getDocument({ url: file, CanvasFactory });
 
 		// Set up abort handler if signal provided
 		const abortHandler = signal ? () => loadingTask.destroy() : undefined;
@@ -156,8 +157,50 @@ type CanvasType = {
 	canvas: import("canvas").Canvas
 }
 
+const isNode = typeof document === "undefined"
+
+/**
+ * Lazily loaded canvas module for Node.js environments.
+ * Cached to avoid repeated dynamic imports.
+ */
+let canvasModule: typeof import("canvas") | undefined
+
+async function getCanvasModule() {
+	if (!canvasModule) {
+		canvasModule = await import("canvas")
+	}
+	return canvasModule
+}
+
+/**
+ * Custom CanvasFactory for pdfjs-dist that uses the `canvas` npm package.
+ * This ensures pdfjs-dist's internal temporary canvases (used for inline images,
+ * scaling, etc.) are compatible with the main rendering canvas.
+ *
+ * Without this, pdfjs-dist defaults to its built-in NodeCanvasFactory which
+ * requires @napi-rs/canvas, causing type mismatches with the canvas package.
+ */
+function buildNodeCanvasFactoryClass(canvasMod: typeof import("canvas")) {
+	return class NodeCanvasFactory {
+		create(width: number, height: number) {
+			const canvas = canvasMod.createCanvas(width, height)
+			return { canvas, context: canvas.getContext("2d") }
+		}
+		reset(canvasAndContext: Record<string, unknown>, width: number, height: number) {
+			(canvasAndContext.canvas as import("canvas").Canvas).width = width;
+			(canvasAndContext.canvas as import("canvas").Canvas).height = height
+		}
+		destroy(canvasAndContext: Record<string, unknown>) {
+			(canvasAndContext.canvas as import("canvas").Canvas).width = 0;
+			(canvasAndContext.canvas as import("canvas").Canvas).height = 0
+			canvasAndContext.canvas = null
+			canvasAndContext.context = null
+		}
+	}
+}
+
 async function createCanvas(width: number, height: number): Promise<CanvasType> {
-	if (typeof document !== "undefined") {
+	if (!isNode) {
 		const canvas = document.createElement("canvas")
 		canvas.width = width
 		canvas.height = height
@@ -167,10 +210,10 @@ async function createCanvas(width: number, height: number): Promise<CanvasType> 
 		}
 	}
 
-	const { createCanvas } = await import("canvas")
+	const mod = await getCanvasModule()
 	return {
 		type: 'node',
-		canvas: createCanvas(width, height)
+		canvas: mod.createCanvas(width, height)
 	}
 }
 
