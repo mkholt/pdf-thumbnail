@@ -458,11 +458,6 @@
     "@jridgewell/resolve-uri" "^3.1.0"
     "@jridgewell/sourcemap-codec" "^1.4.14"
 
-"@mkholt/utilities@^1.0.2":
-  version "1.0.2"
-  resolved "https://registry.yarnpkg.com/@mkholt/utilities/-/utilities-1.0.2.tgz#7c3e4d319d593e24d03dd2929c0978c5afab6097"
-  integrity sha512-LZ7h9ykj1lQOAszOQ3C1E46Itnv8j4PaBfjKGsdHQ4zyoUUq+snst46fadY2V69txkrptCoMERp1GUbDveC/zA==
-
 "@mswjs/interceptors@^0.40.0":
   version "0.40.0"
   resolved "https://registry.yarnpkg.com/@mswjs/interceptors/-/interceptors-0.40.0.tgz#1b45f215ba8c2983ed133763ca03af92896083d6"

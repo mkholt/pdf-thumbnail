@@ -1,5 +1,4 @@
 import { renderPageAsImage, getDocumentProxy } from "unpdf"
-import { isDefined } from "@mkholt/utilities"
 import { FileData, Thumbnail, StringThumbnail, BufferThumbnail } from "../types/index.js"
 import { createLogger, type LogLevel } from "./logging.js"
 
@@ -108,9 +107,16 @@ export async function createThumbnail(file: string, options?: CreateThumbnailOpt
 		}
 
 		const doc = await getDocumentProxy(new Uint8Array(pdfData))
-		const pageToFetch = Math.max(1, Math.min(page, doc.numPages));
-		log.debug("PDF loaded,", doc.numPages, "page(s), getting page", pageToFetch)
+		const numPages = doc.numPages;
 		doc.destroy()
+
+		if (numPages === 0) {
+			log.error("PDF has no pages:", file);
+			return undefined;
+		}
+
+		const pageToFetch = Math.max(1, Math.min(page, numPages));
+		log.debug("PDF loaded,", numPages, "page(s), getting page", pageToFetch)
 
 		if (signal?.aborted) {
 			log.debug("Operation aborted after page fetch");
@@ -166,6 +172,10 @@ async function loadPdfData(file: string, signal?: AbortSignal): Promise<Uint8Arr
 	return new Uint8Array(await response.arrayBuffer())
 }
 
+function isDefined<T>(value: T | undefined): value is T {
+	return value !== undefined;
+}
+
 function isUrl(str: string): boolean {
 	try {
 		const url = new URL(str)
@@ -173,8 +183,7 @@ function isUrl(str: string): boolean {
 			url.protocol === "http:" ||
 			url.protocol === "https:" ||
 			url.protocol === "data:" ||
-			url.protocol === "blob:" ||
-			url.protocol === "file:"
+			url.protocol === "blob:"
 		)
 	} catch {
 		return false

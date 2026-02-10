@@ -1,6 +1,14 @@
 import { describe, expect, test, vi } from "vitest";
 import { createThumbnail, createThumbnails } from "../../src/lib/pdf.js";
 import { FileData } from "../../src/types/index.js";
+import { getDocumentProxy } from "unpdf";
+
+vi.mock("unpdf", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("unpdf")>();
+	return { ...actual, getDocumentProxy: vi.fn(actual.getDocumentProxy) };
+});
+
+const mockedGetDocumentProxy = vi.mocked(getDocumentProxy);
 
 /**
  * Creates a mock AbortSignal that becomes aborted after a specified number of checks.
@@ -211,6 +219,16 @@ describe("PDF Thumbnail Creation Tests", () => {
 		expect(thumb).toBeDefined();
 		expect(thumb?.thumbType).toBe("string");
 		expect(thumb?.thumbData?.length).toBeGreaterThan(0);
+	});
+
+	test("Creating a thumbnail from a PDF with 0 pages returns undefined", async () => {
+		mockedGetDocumentProxy.mockResolvedValueOnce({
+			numPages: 0,
+			destroy: () => {},
+		} as unknown as Awaited<ReturnType<typeof getDocumentProxy>>);
+
+		const thumb = await createThumbnail("tests/samples/sample.pdf");
+		expect(thumb).toBeUndefined();
 	});
 
 	test("Creating a thumbnail with pre-aborted signal returns undefined", async () => {
