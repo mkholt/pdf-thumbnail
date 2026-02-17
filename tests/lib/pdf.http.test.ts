@@ -29,7 +29,7 @@ describe("PDF thumbnail creation via HTTP URL", () => {
 		expect(thumb?.thumbData?.length).toBeGreaterThan(0);
 	});
 
-	test("Creating a thumbnail from a non-2xx response returns undefined", async () => {
+	test("Creating a thumbnail from a non-2xx response returns an error", async () => {
 		server.use(
 			http.get('http://localhost:3000/samples/:filename', () => {
 				return new HttpResponse(null, { status: 404 })
@@ -37,7 +37,8 @@ describe("PDF thumbnail creation via HTTP URL", () => {
 		);
 
 		const thumb = await createThumbnail("http://localhost:3000/samples/notfound.pdf");
-		expect(thumb).toBeUndefined();
+		expect(thumb?.thumbType).toBe("error");
+		expect(thumb?.thumbData).toContain("404");
 	});
 
 	test("Creating a thumbnail from an HTTPS URL", async () => {
@@ -59,9 +60,9 @@ describe("PDF thumbnail creation via HTTP URL", () => {
 		try {
 			const mod = await import('../../src/lib/pdf.js');
 			// With isNodeRuntime=false, canvasImport is undefined.
-			// renderPageAsImage fails without canvas in Node, so returns undefined.
+			// renderPageAsImage fails without canvas in Node, so returns an error.
 			const thumb = await mod.createThumbnail("http://localhost:3000/samples/sample.pdf");
-			expect(thumb).toBeUndefined();
+			expect(thumb?.thumbType).toBe("error");
 		} finally {
 			Object.defineProperty(process.versions, 'node', { value: origNode, configurable: true });
 			vi.resetModules();

@@ -1,5 +1,5 @@
 import { renderPageAsImage, getDocumentProxy, createIsomorphicCanvasFactory } from "unpdf"
-import { FileData, Thumbnail, StringThumbnail, BufferThumbnail } from "../types/index.js"
+import { FileData, Thumbnail, StringThumbnail, BufferThumbnail, ErrorThumbnail } from "../types/index.js"
 import { createLogger, type LogLevel } from "./logging.js"
 
 export type { LogLevel } from "./logging.js"
@@ -9,7 +9,7 @@ export type { LogLevel } from "./logging.js"
  */
 export type CreateThumbnailOptions = {
 	/** The output format: "string" for base64 dataURL (default) or "buffer" for Buffer */
-	output?: Thumbnail["thumbType"];
+	output?: "string" | "buffer";
 
 	/**
 	 * Controls logging verbosity:
@@ -42,8 +42,6 @@ export type CreateThumbnailsOptions = CreateThumbnailOptions & {
 	/** Callback for progress updates during batch processing */
 	onProgress?: (completed: number, total: number) => void;
 
-	/** Callback invoked when a file fails to generate a thumbnail */
-	onError?: (file: string) => void;
 }
 
 /**
@@ -53,12 +51,12 @@ export type CreateThumbnailsOptions = CreateThumbnailOptions & {
  * @param options Options for thumbnail creation
  * @returns The files with the thumbnail data included
  */
-export async function createThumbnails<T extends FileData>(files: T[], options: CreateThumbnailsOptions & { output: "buffer" }): Promise<(T & BufferThumbnail)[]>;
-export async function createThumbnails<T extends FileData>(files: T[], options?: CreateThumbnailsOptions): Promise<(T & StringThumbnail)[]>;
+export async function createThumbnails<T extends FileData>(files: T[], options: CreateThumbnailsOptions & { output: "buffer" }): Promise<(T & (BufferThumbnail | ErrorThumbnail))[]>;
+export async function createThumbnails<T extends FileData>(files: T[], options?: CreateThumbnailsOptions): Promise<(T & (StringThumbnail | ErrorThumbnail))[]>;
 export async function createThumbnails<T extends FileData>(files: T[], options?: CreateThumbnailsOptions): Promise<(T & Thumbnail)[]> {
 	if (!files.length) return [];
 
-	const { prefix, output, logLevel = "error", scale, page, signal, concurrency = Infinity, onProgress, onError } = options ?? {};
+	const { prefix, output, logLevel = "error", scale, page, signal, concurrency = Infinity, onProgress } = options ?? {};
 
 	if (signal?.aborted) {
 		return [];
@@ -74,17 +72,14 @@ export async function createThumbnails<T extends FileData>(files: T[], options?:
 		}
 
 		const resolvedFile = `${prefix ?? ""}${d.file}`;
-		const thumb = await createThumbnail(resolvedFile, { output, logLevel, scale, page, signal });
+		const result = await createThumbnail(resolvedFile, { output, logLevel, scale, page, signal });
 
 		completed++;
 		onProgress?.(completed, total);
 
-		if (!thumb) {
-			onError?.(resolvedFile);
-			return undefined;
-		}
+		if (!result) return undefined; // aborted
 
-		return { ...d, ...thumb } satisfies (T & Thumbnail);
+		return { ...d, ...result };
 	};
 
 	const thumbnails = await mapWithConcurrency(validFiles, concurrency, processFile);
@@ -96,9 +91,9 @@ export async function createThumbnails<T extends FileData>(files: T[], options?:
  * @param file The file to create a thumbnail for
  * @param options Options for thumbnail creation
  */
-export async function createThumbnail(file: string, options: CreateThumbnailOptions & { output: "buffer" }): Promise<BufferThumbnail | undefined>;
-export async function createThumbnail(file: string, options?: CreateThumbnailOptions): Promise<StringThumbnail | undefined>;
-export async function createThumbnail(file: string, options?: CreateThumbnailOptions): Promise<StringThumbnail | BufferThumbnail | undefined> {
+export async function createThumbnail(file: string, options: CreateThumbnailOptions & { output: "buffer" }): Promise<BufferThumbnail | ErrorThumbnail | undefined>;
+export async function createThumbnail(file: string, options?: CreateThumbnailOptions): Promise<StringThumbnail | ErrorThumbnail | undefined>;
+export async function createThumbnail(file: string, options?: CreateThumbnailOptions): Promise<Thumbnail | undefined> {
 	const { output, logLevel = "error", scale = 1, page = 1, signal } = options ?? {};
 	const log = createLogger(logLevel);
 
@@ -123,7 +118,7 @@ export async function createThumbnail(file: string, options?: CreateThumbnailOpt
 
 		if (doc.numPages === 0) {
 			log.error("PDF has no pages:", file);
-			return undefined;
+			return { thumbType: "error", thumbData: "PDF has no pages" };
 		}
 
 		const pageToFetch = Math.max(1, Math.min(page, doc.numPages));
@@ -150,8 +145,10 @@ export async function createThumbnail(file: string, options?: CreateThumbnailOpt
 			log.debug("Operation aborted:", file);
 			return undefined;
 		}
+		const message = e instanceof Error ? e.message : String(e)
 		log.error("Error trying to make thumbnail of file", file)
 		log.error(e)
+		return { thumbType: "error", thumbData: message }
 	} finally {
 		doc?.destroy()
 	}

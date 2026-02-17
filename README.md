@@ -91,7 +91,9 @@ export async function data(pageContext: PageContext) {
 - Generate thumbnails from PDF documents
 - Easy to use API
 - Supports outputting directly to a data URL or Buffer
+- Structured error results with error details
 - Customizable scale and page selection
+- Concurrency control for batch operations
 - Progress callback for batch operations
 - AbortSignal support for cancellation
 - React hook with loading/error state
@@ -108,7 +110,7 @@ This library processes file paths and URLs as provided. When using it with untru
 
 ### `createThumbnail(file, options?)`
 
-Creates a thumbnail for a single PDF file.
+Creates a thumbnail for a single PDF file. Returns a `StringThumbnail` or `BufferThumbnail` on success, an `ErrorThumbnail` on failure, or `undefined` if the operation was aborted.
 
 ```typescript
 const thumb = await createThumbnail("path/to/file.pdf", {
@@ -118,22 +120,35 @@ const thumb = await createThumbnail("path/to/file.pdf", {
 	signal: abortController.signal,  // Optional AbortSignal
 	logLevel: "error", // "silent" | "error" | "debug"
 });
+
+if (!thumb) {
+	// Operation was aborted
+} else if (thumb.thumbType === "error") {
+	console.error("Failed:", thumb.thumbData);
+} else {
+	// thumb.thumbData is a base64 data URL or Buffer
+}
 ```
 
 ### `createThumbnails(files, options?)`
 
-Creates thumbnails for multiple files.
+Creates thumbnails for multiple files. The returned array includes both successful thumbnails and `ErrorThumbnail` results for files that failed. Aborted files are excluded from the results.
 
 ```typescript
 const thumbs = await createThumbnails(files, {
 	prefix: "public/",  // Prefix for file paths
 	scale: 0.5,         // Scale factor
 	page: 1,            // Page number
+	concurrency: 4,     // Max parallel operations (default: Infinity)
 	signal: abortController.signal,
 	onProgress: (completed, total) => {
 		console.log(`Progress: ${completed}/${total}`);
 	}
 });
+
+// Separate successes from errors
+const successes = thumbs.filter(t => t.thumbType !== "error");
+const errors = thumbs.filter(t => t.thumbType === "error");
 ```
 
 ### `useThumbnails(files, options?)` (React Hook)
@@ -162,7 +177,32 @@ npm uninstall canvas
 npm install @napi-rs/canvas
 ```
 
-No code changes are needed — the public API is unchanged.
+### Breaking Change: Error handling
+
+`createThumbnail` now returns an `ErrorThumbnail` (with `thumbType: "error"` and the error message in `thumbData`) instead of `undefined` when a file fails to process. `undefined` is now reserved exclusively for aborted operations.
+
+```typescript
+// v2 — errors returned undefined
+const thumb = await createThumbnail("file.pdf");
+if (!thumb) {
+	// Could be an error or an abort — no way to tell
+}
+
+// v3 — errors are structured
+const thumb = await createThumbnail("file.pdf");
+if (!thumb) {
+	// Aborted
+} else if (thumb.thumbType === "error") {
+	console.error(thumb.thumbData); // Error message
+}
+```
+
+`createThumbnails` now includes `ErrorThumbnail` results in the returned array instead of silently dropping failed files. If you previously relied on the array only containing successes, filter by `thumbType`:
+
+```typescript
+const results = await createThumbnails(files);
+const successes = results.filter(t => t.thumbType !== "error");
+```
 
 ### Node.js version
 

@@ -52,9 +52,10 @@ describe("PDF Thumbnail Creation Tests", () => {
 		expect(thumb?.thumbData).toMatch(/^data:image\/png;base64,/);
 	});
 
-	test("Creating a thumbnail from a non-PDF", async () => {
+	test("Creating a thumbnail from a non-PDF returns an error", async () => {
 		const thumb = await createThumbnail("tests/samples/sample.jpg");
-		expect(thumb).toBeUndefined();
+		expect(thumb?.thumbType).toBe("error");
+		expect(thumb?.thumbData).toEqual(expect.any(String));
 	});
 
 	test("Creating a thumbnail with buffer output from a PDF", async () => {
@@ -65,24 +66,25 @@ describe("PDF Thumbnail Creation Tests", () => {
 		expect(thumb?.thumbData?.length).toBeGreaterThan(0);
 	});
 
-	test("Creating a thumbnail with buffer output from a non-PDF", async () => {
+	test("Creating a thumbnail with buffer output from a non-PDF returns an error", async () => {
 		const thumb = await createThumbnail("tests/samples/sample.jpg", { output: "buffer" });
-		expect(thumb).toBeUndefined();
+		expect(thumb?.thumbType).toBe("error");
 	});
 
-	test("Creating a thumbnail from a non-existent file", async () => {
+	test("Creating a thumbnail from a non-existent file returns an error", async () => {
 		const thumb = await createThumbnail("tests/nonexistent.pdf");
-		expect(thumb).toBeUndefined();
+		expect(thumb?.thumbType).toBe("error");
+		expect(thumb?.thumbData).toEqual(expect.any(String));
 	});
 
-	test("Creating a thumbnail from a URL with unsupported protocol returns undefined", async () => {
+	test("Creating a thumbnail from a URL with unsupported protocol returns an error", async () => {
 		const thumb = await createThumbnail("ftp://example.com/sample.pdf");
-		expect(thumb).toBeUndefined();
+		expect(thumb?.thumbType).toBe("error");
 	});
 
-	test("Creating a thumbnail with buffer output from a non-existent file", async () => {
+	test("Creating a thumbnail with buffer output from a non-existent file returns an error", async () => {
 		const thumb = await createThumbnail("tests/nonexistent.pdf", { output: "buffer" });
-		expect(thumb).toBeUndefined();
+		expect(thumb?.thumbType).toBe("error");
 	});
 
 	test("Creating thumbnails from multiple PDFs", async () => {
@@ -101,32 +103,36 @@ describe("PDF Thumbnail Creation Tests", () => {
 		});
 	});
 
-	test("Creating thumbnails from multiple files including non-PDFs", async () => {
+	test("Creating thumbnails from multiple files including non-PDFs returns errors inline", async () => {
 		const files: FileData[] = [
 			{ file: "tests/samples/sample.pdf" },
 			{ file: "tests/samples/sample.jpg" }
 		];
 		const thumbnails = await createThumbnails(files);
-		expect(thumbnails).toHaveLength(1);
-		expect(thumbnails[0].thumbData).toBeDefined();
-		expect(thumbnails[0].thumbData).to.be.a("string");
-		expect(thumbnails[0].thumbData?.length).toBeGreaterThan(0);
-		expect(thumbnails[0].thumbData).toMatch(/^data:image\/png;base64,/);
-		expect(thumbnails[0].file).toBe(files[0].file);
+		expect(thumbnails).toHaveLength(2);
+
+		const successes = thumbnails.filter(t => t.thumbType !== "error");
+		const errors = thumbnails.filter(t => t.thumbType === "error");
+		expect(successes).toHaveLength(1);
+		expect(errors).toHaveLength(1);
+		expect(successes[0].file).toBe(files[0].file);
+		expect(errors[0].file).toBe(files[1].file);
 	});
 
-	test("Creating thumbnails from multiple files including non-existent files", async () => {
+	test("Creating thumbnails from multiple files including non-existent files returns errors inline", async () => {
 		const files: FileData[] = [
 			{ file: "tests/samples/sample.pdf" },
 			{ file: "tests/samples/nonexistent.pdf" }
 		];
 		const thumbnails = await createThumbnails(files);
-		expect(thumbnails).toHaveLength(1);
-		expect(thumbnails[0].thumbData).toBeDefined();
-		expect(thumbnails[0].thumbData).to.be.a("string");
-		expect(thumbnails[0].thumbData?.length).toBeGreaterThan(0);
-		expect(thumbnails[0].thumbData).toMatch(/^data:image\/png;base64,/);
-		expect(thumbnails[0].file).toBe(files[0].file);
+		expect(thumbnails).toHaveLength(2);
+
+		const successes = thumbnails.filter(t => t.thumbType !== "error");
+		const errors = thumbnails.filter(t => t.thumbType === "error");
+		expect(successes).toHaveLength(1);
+		expect(errors).toHaveLength(1);
+		expect(successes[0].file).toBe(files[0].file);
+		expect(errors[0].file).toBe(files[1].file);
 	});
 
 	test("Creating thumbnails with prefix", async () => {
@@ -221,14 +227,23 @@ describe("PDF Thumbnail Creation Tests", () => {
 		expect(thumb?.thumbData?.length).toBeGreaterThan(0);
 	});
 
-	test("Creating a thumbnail from a PDF with 0 pages returns undefined", async () => {
+	test("Creating a thumbnail converts non-Error exceptions to error message", async () => {
+		mockedGetDocumentProxy.mockRejectedValueOnce("raw string error");
+
+		const thumb = await createThumbnail("tests/samples/sample.pdf");
+		expect(thumb?.thumbType).toBe("error");
+		expect(thumb?.thumbData).toBe("raw string error");
+	});
+
+	test("Creating a thumbnail from a PDF with 0 pages returns an error", async () => {
 		mockedGetDocumentProxy.mockResolvedValueOnce({
 			numPages: 0,
 			destroy: () => {},
 		} as unknown as Awaited<ReturnType<typeof getDocumentProxy>>);
 
 		const thumb = await createThumbnail("tests/samples/sample.pdf");
-		expect(thumb).toBeUndefined();
+		expect(thumb?.thumbType).toBe("error");
+		expect(thumb?.thumbData).toContain("no pages");
 	});
 
 	test("Creating a thumbnail with pre-aborted signal returns undefined", async () => {
@@ -258,9 +273,9 @@ describe("PDF Thumbnail Creation Tests", () => {
 		controller.abort();
 
 		const thumb = await promise;
-		// Should either complete (if abort was too late) or return undefined (if aborted)
+		// Should either complete (if abort was too late), return undefined (if aborted), or return error
 		// The key is no errors are thrown
-		expect(thumb === undefined || thumb?.thumbData !== undefined).toBe(true);
+		expect(thumb === undefined || thumb?.thumbType === "error" || thumb?.thumbData !== undefined).toBe(true);
 	});
 
 	test("Aborting createThumbnail with delay returns undefined without error", async () => {
@@ -273,7 +288,7 @@ describe("PDF Thumbnail Creation Tests", () => {
 		controller.abort();
 
 		const thumb = await promise;
-		expect(thumb === undefined || thumb?.thumbData !== undefined).toBe(true);
+		expect(thumb === undefined || thumb?.thumbType === "error" || thumb?.thumbData !== undefined).toBe(true);
 	});
 
 	test("Aborting createThumbnails checks signal before processing each file", async () => {
@@ -320,8 +335,8 @@ describe("PDF Thumbnail Creation Tests", () => {
 			}
 		});
 
-		expect(thumbnails.length).toBe(1); // Only valid file succeeds
-		expect(progressCalls.length).toBe(2); // But progress called for both
+		expect(thumbnails.length).toBe(2); // Both returned (1 success + 1 error)
+		expect(progressCalls.length).toBe(2); // Progress called for both
 	});
 
 	test("Creating thumbnails with scale passed through options", async () => {
@@ -331,42 +346,41 @@ describe("PDF Thumbnail Creation Tests", () => {
 		expect(thumbnails[0].thumbData).toBeDefined();
 	});
 
-	test("Creating thumbnails with onError callback reports failed files", async () => {
-		const errorFiles: string[] = [];
+	test("Creating thumbnails returns error results with file property preserved", async () => {
 		const files: FileData[] = [
 			{ file: "tests/samples/sample.pdf" },
 			{ file: "tests/samples/nonexistent.pdf" },
 			{ file: "tests/samples/sample.jpg" },
 		];
 
-		const thumbnails = await createThumbnails(files, {
-			onError: (file) => errorFiles.push(file),
-		});
+		const thumbnails = await createThumbnails(files);
 
-		expect(thumbnails).toHaveLength(1);
-		expect(errorFiles).toEqual(["tests/samples/nonexistent.pdf", "tests/samples/sample.jpg"]);
+		expect(thumbnails).toHaveLength(3);
+		const errors = thumbnails.filter(t => t.thumbType === "error");
+		expect(errors).toHaveLength(2);
+		expect(errors.map(e => e.file)).toEqual(["tests/samples/nonexistent.pdf", "tests/samples/sample.jpg"]);
 	});
 
-	test("Creating thumbnails with onError and prefix reports resolved file path", async () => {
-		const errorFiles: string[] = [];
+	test("Creating thumbnails with prefix preserves resolved path in error results", async () => {
 		const files: FileData[] = [{ file: "nonexistent.pdf" }];
 
-		await createThumbnails(files, {
-			prefix: "tests/samples/",
-			onError: (file) => errorFiles.push(file),
-		});
+		const thumbnails = await createThumbnails(files, { prefix: "tests/samples/" });
 
-		expect(errorFiles).toEqual(["tests/samples/nonexistent.pdf"]);
+		expect(thumbnails).toHaveLength(1);
+		expect(thumbnails[0].thumbType).toBe("error");
+		expect(thumbnails[0].file).toBe("nonexistent.pdf");
 	});
 
-	test("Creating thumbnails without onError still works", async () => {
+	test("Creating thumbnails with mixed results includes both successes and errors", async () => {
 		const files: FileData[] = [
 			{ file: "tests/samples/sample.pdf" },
 			{ file: "tests/samples/nonexistent.pdf" },
 		];
 
 		const thumbnails = await createThumbnails(files);
-		expect(thumbnails).toHaveLength(1);
+		expect(thumbnails).toHaveLength(2);
+		expect(thumbnails[0].thumbType).toBe("string");
+		expect(thumbnails[1].thumbType).toBe("error");
 	});
 
 	test("Creating thumbnails with concurrency: 1 processes files sequentially", async () => {

@@ -1,5 +1,5 @@
 import React from "react";
-import { FileData, StringThumbnail } from "../types/index.js";
+import { FileData, StringThumbnail, ErrorThumbnail } from "../types/index.js";
 import { createThumbnails } from "../lib/index.js";
 
 export type UseThumbnailsOptions = {
@@ -64,9 +64,22 @@ export function useThumbnails<T extends FileData>(files: T[], options?: UseThumb
 		createThumbnails(files, {
 			...options,
 			signal: abortController.signal,
-		}).then(thumbs => {
+		}).then(results => {
 			if (!isCancelled) {
-				setState({ thumbnails: thumbs, isLoading: false, error: null });
+				const successes = results.filter(
+					(r): r is T & StringThumbnail => r.thumbType !== "error"
+				);
+				const failures = results.filter(
+					(r): r is T & ErrorThumbnail => r.thumbType === "error"
+				);
+
+				setState({
+					thumbnails: successes,
+					isLoading: false,
+					error: failures.length > 0
+						? new Error(failures.map(e => `${e.file}: ${e.thumbData}`).join("; "))
+						: null,
+				});
 			}
 		}).catch(err => {
 			if (!isCancelled) {

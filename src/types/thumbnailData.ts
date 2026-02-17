@@ -1,4 +1,4 @@
-export type Thumbnail = StringThumbnail | BufferThumbnail;
+export type Thumbnail = StringThumbnail | BufferThumbnail | ErrorThumbnail;
 
 export type StringThumbnail = {
 	thumbType: "string"
@@ -8,4 +8,9 @@ export type StringThumbnail = {
 export type BufferThumbnail = {
 	thumbType: "buffer"
 	thumbData: Buffer;
+}
+
+export type ErrorThumbnail = {
+	thumbType: "error"
+	thumbData: string
 }

@@ -3,7 +3,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { useThumbnails } from '../../src/hooks/useThumbnails.js';
-import type { FileData, StringThumbnail } from '../../src/types/index.js';
+import type { FileData, StringThumbnail, ErrorThumbnail } from '../../src/types/index.js';
 
 // Mock the createThumbnails function to avoid canvas/pdfjs issues in jsdom
 vi.mock('../../src/lib/index.js', () => ({
@@ -126,6 +126,26 @@ describe('useThumbnails hook', () => {
 			await waitFor(() => {
 				expect(result.current.isLoading).toBe(false);
 				expect(result.current.error).toEqual(testError);
+			});
+		});
+
+		it('should populate error state from ErrorThumbnail results', async () => {
+			const files: FileData[] = [{ file: 'good.pdf' }, { file: 'bad.pdf' }];
+			const mixedResults: (FileData & (StringThumbnail | ErrorThumbnail))[] = [
+				{ file: 'good.pdf', thumbType: 'string', thumbData: 'data:image/png;base64,mock' },
+				{ file: 'bad.pdf', thumbType: 'error', thumbData: 'PDF has no pages' },
+			];
+			mockedCreateThumbnails.mockResolvedValue(mixedResults);
+
+			const { result } = renderHook(() => useThumbnails(files));
+
+			await waitFor(() => {
+				expect(result.current.isLoading).toBe(false);
+				expect(result.current.thumbnails).toHaveLength(1);
+				expect(result.current.thumbnails[0].file).toBe('good.pdf');
+				expect(result.current.error).toBeInstanceOf(Error);
+				expect(result.current.error?.message).toContain('bad.pdf');
+				expect(result.current.error?.message).toContain('PDF has no pages');
 			});
 		});
 
